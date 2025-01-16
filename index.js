@@ -39,7 +39,26 @@ async function run() {
         })
 
         app.get('/meals', async (req, res) => {
-            const result = await mealCollection.find().toArray()
+            const search = req.query?.search
+            const category = req.query?.category
+            const price = req.query?.price 
+            let query = {}
+            if (search) {
+                query = {
+                    title: {
+                    $regex:search, $options:'i'
+                }}
+            }
+            if (category && category !== 'All Categories') {
+                query.category = category
+            }
+            let setPriceQuery = {}
+            if (price === 'Price(low to high)') {
+                setPriceQuery.price = 1;
+            } else if (price === 'Price(high to low)') {
+                setPriceQuery.price = -1;
+            }
+            const result = await mealCollection.find(query).sort(setPriceQuery).toArray()
             res.send(result)
         })
 
