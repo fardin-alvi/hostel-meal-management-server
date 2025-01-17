@@ -32,7 +32,7 @@ async function run() {
 
         const userCollection = client.db('BunkInnDB').collection('users')
         const mealCollection = client.db('BunkInnDB').collection('meals')
-        const userInteractCollection = client.db('BunkInnDB').collection('user_interaction')
+        const reviewCollection = client.db('BunkInnDB').collection('reviews')
         const packageCollection = client.db('BunkInnDB').collection('package')
         const mealRequestCollection = client.db('BunkInnDB').collection('mealRequest')
         const paymentCollection = client.db('BunkInnDB').collection('payments')
@@ -69,13 +69,14 @@ async function run() {
         app.get('/meals', async (req, res) => {
             const search = req.query?.search
             const category = req.query?.category
-            const price = req.query?.price 
+            const price = req.query?.price
             let query = {}
             if (search) {
                 query = {
                     title: {
-                    $regex:search, $options:'i'
-                }}
+                        $regex: search, $options: 'i'
+                    }
+                }
             }
             if (category && category !== 'All Categories') {
                 query.category = category
@@ -111,30 +112,42 @@ async function run() {
             const result = await packageCollection.find().toArray()
             res.send(result)
         })
-        
+
         app.get('/package/:id', async (req, res) => {
-            const id = req.params?.id 
-            const query = {_id: new ObjectId(id)}
+            const id = req.params?.id
+            // console.log(id);
+            const query = { _id: new ObjectId(id) }
             const result = await packageCollection.findOne(query)
+            // console.log("package result",result);
             res.send(result)
-        } )
+        })
 
 
         // review & meal request
 
         app.post('/review', async (req, res) => {
             const review = req.body
-            const result = await userInteractCollection.insertOne(review)
+            const result = await reviewCollection.insertOne(review)
             res.send(result)
         })
 
-        app.get('/reviews', async (req, res) => {
-            const result = await userInteractCollection.find().toArray()
+        app.get('/reviews/:id', async (req, res) => {
+            const id = req.params.id
+            const query = { mealId: id }
+            const result = await reviewCollection.find(query).toArray()
+            res.send(result)
+        })
+        app.get('/reviews/:email', async (req, res) => {
+            const useremail = req.params.email
+            console.log(useremail);
+            const query = { email: useremail }
+            const result = await reviewCollection.find(query).toArray()
+            console.log(result);
             res.send(result)
         })
 
         app.post('/mealrequest', async (req, res) => {
-            const mealRequest = req.body 
+            const mealRequest = req.body
             const result = await mealRequestCollection.insertOne(mealRequest)
             res.send(result)
         })
@@ -144,22 +157,40 @@ async function run() {
             res.send(result)
         })
 
+        app.delete('/mealreq/:id', async (req, res) => {
+            const id = req.params.id
+            const query = { _id: new ObjectId(id) }
+            const result = await mealRequestCollection.deleteOne(query)
+            res.send(result)
+        })
+
         // payments releted isssue
 
-        // app.post('/payment-intent-method', async (req, res) => {
-        //     const { price } = req.body
-        //     console.log(price);
-        //     const payment = parseInt(price*100)
-        //     console.log('recived', payment)
-        //     const paymentIntent = await stripe.paymentIntents.create({
-        //         amount: payment,
-        //         currency: 'usd',
-        //         payment_method_types: ['card']
-        //     })
-        //     res.send({
-        //         clientSecret: paymentIntent.client_secret
-        //     })
-        // })
+        app.post('/payment-intent-method', async (req, res) => {
+            const { price } = req.body
+            const payment = parseInt(price?.replace("$",""))*100
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: payment,
+                currency: 'usd',
+                payment_method_types: ['card']
+            })
+            res.send({
+                clientSecret: paymentIntent.client_secret
+            })
+        })
+
+        app.post('/payments', async (req, res) => {
+            const payment = req.body 
+            const result = await paymentCollection.insertOne(payment)
+            res.send(result)
+        })
+
+        app.get('/paymentInfo/:email', async (req, res) => {
+            const useremail = req.params.email 
+            const query = { email: useremail }
+            const result = await paymentCollection.findOne(query)
+            res.send(result)
+        })
 
 
 
