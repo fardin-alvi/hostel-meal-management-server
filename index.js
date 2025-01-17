@@ -55,7 +55,7 @@ async function run() {
                 if (err) {
                     return res.status(401).send({ message: 'unAuthorized Access' })
                 }
-                req.user = decoded
+                req.decoded = decoded
                 next()
             })
         }
@@ -65,6 +65,32 @@ async function run() {
             const result = await userCollection.insertOne(user)
             res.send(result)
         })
+        app.get('/users/admin/:email', verifyToken, async (req, res) => {
+            const email = req.params.email
+            if (email !== req.decoded.email) {
+                return res.status(403).send({ message: 'Forbidden Access' })
+            }
+            const query = { email: email }
+            const user = await userCollection.findOne(query)
+            let admin = false
+            if (user) {
+                admin = user?.role == 'admin'
+            }
+            res.send({ admin })
+        })
+        app.patch('/users/admin/:id', async (req, res) => {
+            const id = req.params?.id 
+            const filter = { _id: new ObjectId(id) }
+            const updateDoc = {
+                $set: {
+                    role:"admin"
+                }
+            }
+            const result = await userCollection.updateOne(filter, updateDoc)
+            res.send(result)
+        })
+
+        //  meals releted api
 
         app.get('/meals', async (req, res) => {
             const search = req.query?.search
@@ -108,22 +134,6 @@ async function run() {
             res.send(result)
         });
 
-        app.get('/package', async (req, res) => {
-            const result = await packageCollection.find().toArray()
-            res.send(result)
-        })
-
-        app.get('/package/:id', async (req, res) => {
-            const id = req.params?.id
-            // console.log(id);
-            const query = { _id: new ObjectId(id) }
-            const result = await packageCollection.findOne(query)
-            // console.log("package result",result);
-            res.send(result)
-        })
-
-
-        // review & meal request
 
         app.post('/review', async (req, res) => {
             const review = req.body
@@ -137,12 +147,17 @@ async function run() {
             const result = await reviewCollection.find(query).toArray()
             res.send(result)
         })
-        app.get('/reviews/:email', async (req, res) => {
+        app.get('/reviews/email/:email', async (req, res) => {
             const useremail = req.params.email
-            console.log(useremail);
             const query = { email: useremail }
             const result = await reviewCollection.find(query).toArray()
-            console.log(result);
+            res.send(result)
+        })
+
+        app.delete('/reviews/email/:id', async (req, res) => {
+            const id = req.params?.id 
+            const query = { _id: new ObjectId(id) }
+            const result = await reviewCollection.deleteOne(query)
             res.send(result)
         })
 
@@ -163,6 +178,22 @@ async function run() {
             const result = await mealRequestCollection.deleteOne(query)
             res.send(result)
         })
+
+
+        app.get('/package', async (req, res) => {
+            const result = await packageCollection.find().toArray()
+            res.send(result)
+        })
+
+        app.get('/package/:id', async (req, res) => {
+            const id = req.params?.id
+            // console.log(id);
+            const query = { _id: new ObjectId(id) }
+            const result = await packageCollection.findOne(query)
+            // console.log("package result",result);
+            res.send(result)
+        })
+
 
         // payments releted isssue
 
