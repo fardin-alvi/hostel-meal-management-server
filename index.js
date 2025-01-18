@@ -111,10 +111,10 @@ async function run() {
         //  meals releted api
 
 
-        app.post('/meals', async (req, res) => {
+        app.post('/uploadmeals', async (req, res) => {
             const meal = req.body 
             const result = await mealCollection.insertOne(meal)
-            req.send(result)
+            res.send(result)
         })
 
  
@@ -143,12 +143,20 @@ async function run() {
             res.send(result)
         })
 
+        app.get('/meals/adminEmail/:email', verifyToken, async (req, res) => {
+            const useremail = req.params?.email
+            const query = { distributor_email: useremail }
+            const result = await mealCollection.find(query).toArray()
+            res.send(result)
+        })
+
         app.get('/meal/:id', async (req, res) => {
             const id = req.params.id
             const query = { _id: new ObjectId(id) }
             const result = await mealCollection.findOne(query)
             res.send(result)
         })
+
 
         app.patch('/like/:id', async (req, res) => {
             const id = req.params?.id
@@ -175,6 +183,13 @@ async function run() {
         })
         app.get('/reviews/email/:email',verifyToken, async (req, res) => {
             const useremail = req.params.email
+            const query = { email: useremail }
+            const result = await reviewCollection.find(query).toArray()
+            res.send(result)
+        })
+
+        app.get('/reviews/adminEmail/:email', verifyToken, async (req, res) => {
+            const useremail = req.params?.email
             const query = { email: useremail }
             const result = await reviewCollection.find(query).toArray()
             res.send(result)
