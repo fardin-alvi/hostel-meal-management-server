@@ -110,6 +110,14 @@ async function run() {
 
         //  meals releted api
 
+
+        app.post('/meals', async (req, res) => {
+            const meal = req.body 
+            const result = await mealCollection.insertOne(meal)
+            req.send(result)
+        })
+
+ 
         app.get('/meals', async (req, res) => {
             const search = req.query?.search
             const category = req.query?.category
