@@ -78,6 +78,24 @@ async function run() {
             }
             res.send({ admin })
         })
+
+        app.get('/users',verifyToken, async (req, res) => {
+            const userEmail = req.decoded?.email 
+            const search = req.query?.search || "";
+            const query = {
+                email: {
+                    $ne: userEmail,
+                },
+                $or: [
+                    { name: { $regex: search, $options: "i" } },
+                    { email: { $regex: search, $options: "i" } }
+                ]
+            }
+            const result = await userCollection.find(query).toArray()
+            res.send(result)
+        })
+
+
         app.patch('/users/admin/:id', async (req, res) => {
             const id = req.params?.id 
             const filter = { _id: new ObjectId(id) }
@@ -147,14 +165,14 @@ async function run() {
             const result = await reviewCollection.find(query).toArray()
             res.send(result)
         })
-        app.get('/reviews/email/:email', async (req, res) => {
+        app.get('/reviews/email/:email',verifyToken, async (req, res) => {
             const useremail = req.params.email
             const query = { email: useremail }
             const result = await reviewCollection.find(query).toArray()
             res.send(result)
         })
 
-        app.delete('/reviews/email/:id', async (req, res) => {
+        app.delete('/reviews/email/:id',verifyToken, async (req, res) => {
             const id = req.params?.id 
             const query = { _id: new ObjectId(id) }
             const result = await reviewCollection.deleteOne(query)
@@ -167,12 +185,12 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/mealrequest', async (req, res) => {
+        app.get('/mealrequest',verifyToken, async (req, res) => {
             const result = await mealRequestCollection.find().toArray()
             res.send(result)
         })
 
-        app.delete('/mealreq/:id', async (req, res) => {
+        app.delete('/mealreq/:id',verifyToken, async (req, res) => {
             const id = req.params.id
             const query = { _id: new ObjectId(id) }
             const result = await mealRequestCollection.deleteOne(query)
@@ -213,10 +231,19 @@ async function run() {
         app.post('/payments', async (req, res) => {
             const payment = req.body 
             const result = await paymentCollection.insertOne(payment)
+            if (result?.insertedId) {
+                const filter = { email: payment?.email }
+                const updateDoc = {
+                    $set: {
+                        subscription: payment?.subscription
+                    }
+                }
+                await userCollection.updateOne(filter,updateDoc)
+            }
             res.send(result)
         })
 
-        app.get('/paymentInfo/:email', async (req, res) => {
+        app.get('/paymentInfo/:email',verifyToken, async (req, res) => {
             const useremail = req.params.email 
             const query = { email: useremail }
             const result = await paymentCollection.findOne(query)
