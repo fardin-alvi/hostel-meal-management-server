@@ -66,6 +66,15 @@ async function run() {
             const result = await userCollection.insertOne(user)
             res.send(result)
         })
+
+        app.get('/users/;email', async (req, res) => {
+            const useremail = req.params?.email
+            console.log(useremail);
+            const query = {email:useremail}
+            const result = await userCollection.findOne(query)
+            res.send(result)
+        })
+        
         app.get('/users/admin/:email', verifyToken, async (req, res) => {
             const email = req.params.email
             if (email !== req.decoded.email) {
@@ -80,8 +89,8 @@ async function run() {
             res.send({ admin })
         })
 
-        app.get('/users',verifyToken, async (req, res) => {
-            const userEmail = req.decoded?.email 
+        app.get('/users', verifyToken, async (req, res) => {
+            const userEmail = req.decoded?.email
             const search = req.query?.search || "";
             const query = {
                 email: {
@@ -98,11 +107,11 @@ async function run() {
 
 
         app.patch('/users/admin/:id', async (req, res) => {
-            const id = req.params?.id 
+            const id = req.params?.id
             const filter = { _id: new ObjectId(id) }
             const updateDoc = {
                 $set: {
-                    role:"admin"
+                    role: "admin"
                 }
             }
             const result = await userCollection.updateOne(filter, updateDoc)
@@ -113,58 +122,88 @@ async function run() {
         // admin upcoming meal
 
         app.get('/upcomingmeal/byadmin', async (req, res) => {
-            const result = await upcomingmealCollection.find().toArray()
+            const sort = req.query.sort
+            let sortedData = {}
+            if (sort === 'true') {
+                sortedData = { likes: 1 }
+            }
+            const result = await upcomingmealCollection.find().sort(sortedData).toArray()
+            res.send(result)
+        })
+
+        app.post('/upcoming/meal/byadmin', async (req, res) => {
+            const meal = req.body
+            const result = await upcomingmealCollection.insertOne(meal)
             res.send(result)
         })
 
         app.post('/upcomingmeal/byadmin', async (req, res) => {
-            const meal = req.body 
+            const meal = req.body
             const result = await mealCollection.insertOne(meal)
             if (result.insertedId) {
-                const query = {_id: new ObjectId(meal._id)}
+                const query = { _id: new ObjectId(meal._id) }
                 await upcomingmealCollection.deleteOne(query)
             }
+            res.send(result)
+        })
+
+        app.get('/upcoming/meal/details/:id', async (req, res) => {
+            const id = req.params?.id 
+            const query = { _id: new ObjectId(id) }
+            const result = await upcomingmealCollection.findOne(query)
             res.send(result)
         })
 
         //  meals releted api
 
         app.post('/uploadmeals', async (req, res) => {
-            const meal = req.body 
+            const meal = req.body
             const result = await mealCollection.insertOne(meal)
             res.send(result)
         })
 
- 
         app.get('/meals', async (req, res) => {
-            const search = req.query?.search
-            const category = req.query?.category
-            const price = req.query?.price
-            let query = {}
+            const search = req.query?.search;
+            const category = req.query?.category;
+            const price = req.query?.price;
+            const sort = req.query?.sort;
+
+            let query = {};
             if (search) {
                 query = {
                     title: {
                         $regex: search, $options: 'i'
                     }
-                }
+                };
             }
             if (category && category !== 'All Categories') {
-                query.category = category
+                query.category = category;
             }
-            let setPriceQuery = {}
+
+            let setPriceQuery = {};
             if (price === 'Price(low to high)') {
                 setPriceQuery.price = 1;
             } else if (price === 'Price(high to low)') {
                 setPriceQuery.price = -1;
             }
-            const result = await mealCollection.find(query).sort(setPriceQuery).toArray()
-            res.send(result)
-        })
 
-        app.get('/meals/adminEmail/:email', verifyToken, async (req, res) => {
-            const useremail = req.params?.email
-            const query = { distributor_email: useremail }
-            const result = await mealCollection.find(query).toArray()
+            let sortQuery = {};
+            if (sort === 'likes') {
+                sortQuery.likes = -1;
+            } else if (sort === 'review-Count') {
+                sortQuery.review_count = -1;
+            }
+            const result = await mealCollection.find(query).sort({ ...setPriceQuery, ...sortQuery }).toArray();
+            res.send(result);
+        });
+
+
+
+
+        app.delete('/meals/:id', async (req, res) => {
+            const id = req.params?.id
+            const query = { _id: new ObjectId(id) }
+            const result = await mealCollection.deleteOne(query)
             res.send(result)
         })
 
@@ -216,9 +255,9 @@ async function run() {
             const result = await reviewCollection.find().toArray()
             res.send(result)
         })
-        
+
         app.delete('/admin/review/:id', async (req, res) => {
-            const id = req.params?.id 
+            const id = req.params?.id
             const query = { _id: new ObjectId(id) }
             const result = await reviewCollection.deleteOne(query)
             res.send(result)
@@ -226,7 +265,7 @@ async function run() {
 
         // user getting review releted api
 
-        app.get('/reviews/useremail/:email',verifyToken, async (req, res) => {
+        app.get('/reviews/useremail/:email', verifyToken, async (req, res) => {
             const useremail = req.params.email
             const query = { email: useremail }
             const result = await reviewCollection.find(query).toArray()
@@ -242,8 +281,8 @@ async function run() {
 
         app.delete('/reviews/useremail/:email/meal/:id', verifyToken, async (req, res) => {
             const useremail = req.params?.email
-            const id = req.params?.id 
-            const query = {email:useremail, _id: new ObjectId(id) }
+            const id = req.params?.id
+            const query = { email: useremail, _id: new ObjectId(id) }
             const result = await reviewCollection.deleteOne(query)
             res.send(result)
         })
@@ -258,13 +297,24 @@ async function run() {
 
         // meal request update by admin releted api
 
-        app.get('/admin/mealreq',verifyToken, async (req, res) => {
-            const result = await mealRequestCollection.find().toArray()
+        app.get('/admin/mealreq', verifyToken, async (req, res) => {
+            const search = req.query?.search
+            let query = {}
+            if (search) {
+                query = {
+                    $or: [
+                        { requested_user_name: { $regex: search, $options: "i" } },
+                        { requested_user: { $regex: search, $options: "i" } }
+                    ]
+                };
+            }
+
+            const result = await mealRequestCollection.find(query).toArray()
             res.send(result)
         })
 
-        app.patch('/mealreq/user/:email/meal/:id',verifyToken, async (req, res) => {
-            const email = req.params?.email 
+        app.patch('/mealreq/user/:email/meal/:id', verifyToken, async (req, res) => {
+            const email = req.params?.email
             const id = req.params?.id
             const filter = { requested_user: email, _id: new ObjectId(id) }
             const updateDoc = { $set: { status: "delivered" } }
@@ -276,7 +326,7 @@ async function run() {
 
         app.get('/mealrequest/user/:email', verifyToken, async (req, res) => {
             const reqemail = req.params?.email
-            const query = { requested_user:reqemail}
+            const query = { requested_user: reqemail }
             const result = await mealRequestCollection.find(query).toArray()
             res.send(result)
         })
@@ -284,7 +334,7 @@ async function run() {
         app.delete('/mealreq/useremail/:email/meal/:id', verifyToken, async (req, res) => {
             const reqemail = req.params?.email
             const id = req.params.id
-            const query = { requested_user:reqemail, _id: new ObjectId(id) }
+            const query = { requested_user: reqemail, _id: new ObjectId(id) }
             const result = await mealRequestCollection.deleteOne(query)
             res.send(result)
         })
@@ -298,10 +348,8 @@ async function run() {
 
         app.get('/package/:id', async (req, res) => {
             const id = req.params?.id
-            // console.log(id);
             const query = { _id: new ObjectId(id) }
             const result = await packageCollection.findOne(query)
-            // console.log("package result",result);
             res.send(result)
         })
 
@@ -310,7 +358,7 @@ async function run() {
 
         app.post('/payment-intent-method', async (req, res) => {
             const { price } = req.body
-            const payment = parseInt(price?.replace("$",""))*100
+            const payment = parseInt(price?.replace("$", "")) * 100
             const paymentIntent = await stripe.paymentIntents.create({
                 amount: payment,
                 currency: 'usd',
@@ -322,7 +370,7 @@ async function run() {
         })
 
         app.post('/payments', async (req, res) => {
-            const payment = req.body 
+            const payment = req.body
             const result = await paymentCollection.insertOne(payment)
             if (result?.insertedId) {
                 const filter = { email: payment?.email }
@@ -331,13 +379,13 @@ async function run() {
                         subscription: payment?.subscription
                     }
                 }
-                await userCollection.updateOne(filter,updateDoc)
+                await userCollection.updateOne(filter, updateDoc)
             }
             res.send(result)
         })
 
-        app.get('/paymentInfo/:email',verifyToken, async (req, res) => {
-            const useremail = req.params.email 
+        app.get('/paymentInfo/:email', verifyToken, async (req, res) => {
+            const useremail = req.params.email
             const query = { email: useremail }
             const result = await paymentCollection.findOne(query)
             res.send(result)
