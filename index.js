@@ -36,6 +36,7 @@ async function run() {
         const packageCollection = client.db('BunkInnDB').collection('package')
         const mealRequestCollection = client.db('BunkInnDB').collection('mealRequest')
         const paymentCollection = client.db('BunkInnDB').collection('payments')
+        const upcomingmealCollection = client.db('BunkInnDB').collection('upcoming_meals')
 
         // jwt releted api
 
@@ -108,8 +109,25 @@ async function run() {
             res.send(result)
         })
 
-        //  meals releted api
 
+        // admin upcoming meal
+
+        app.get('/upcomingmeal/byadmin', async (req, res) => {
+            const result = await upcomingmealCollection.find().toArray()
+            res.send(result)
+        })
+
+        app.post('/upcomingmeal/byadmin', async (req, res) => {
+            const meal = req.body 
+            const result = await mealCollection.insertOne(meal)
+            if (result.insertedId) {
+                const query = {_id: new ObjectId(meal._id)}
+                await upcomingmealCollection.deleteOne(query)
+            }
+            res.send(result)
+        })
+
+        //  meals releted api
 
         app.post('/uploadmeals', async (req, res) => {
             const meal = req.body 
