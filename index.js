@@ -150,6 +150,16 @@ async function run() {
             res.send(result)
         })
 
+        // app.delete('/review/meal/:id', async (req, res) => {
+        //     const useremail = req.params?.email 
+        //     console.log(useremail);
+        //     const id = req.params.id 
+        //     console.log(id);
+        //     const query = { email: useremail, _id: new ObjectId(id) }
+        //     const result = await reviewCollection.deleteOne(query)
+        //     res.send(result)
+        // })
+
         app.get('/meal/:id', async (req, res) => {
             const id = req.params.id
             const query = { _id: new ObjectId(id) }
@@ -181,26 +191,46 @@ async function run() {
             const result = await reviewCollection.find(query).toArray()
             res.send(result)
         })
-        app.get('/reviews/email/:email',verifyToken, async (req, res) => {
+
+        // admin can get all review
+
+        app.get('/admin/reviews', async (req, res) => {
+            const result = await reviewCollection.find().toArray()
+            res.send(result)
+        })
+        
+        app.delete('/admin/review/:id', async (req, res) => {
+            const id = req.params?.id 
+            const query = { _id: new ObjectId(id) }
+            const result = await reviewCollection.deleteOne(query)
+            res.send(result)
+        })
+
+        // user getting review releted api
+
+        app.get('/reviews/useremail/:email',verifyToken, async (req, res) => {
             const useremail = req.params.email
             const query = { email: useremail }
             const result = await reviewCollection.find(query).toArray()
             res.send(result)
         })
 
-        app.get('/reviews/adminEmail/:email', verifyToken, async (req, res) => {
-            const useremail = req.params?.email
-            const query = { email: useremail }
-            const result = await reviewCollection.find(query).toArray()
-            res.send(result)
-        })
+        // app.get('/reviews/adminEmail/:email', verifyToken, async (req, res) => {
+        //     const useremail = req.params?.email
+        //     const query = { email: useremail }
+        //     const result = await reviewCollection.find(query).toArray()
+        //     res.send(result)
+        // })
 
-        app.delete('/reviews/email/:id',verifyToken, async (req, res) => {
+        app.delete('/reviews/useremail/:email/meal/:id', verifyToken, async (req, res) => {
+            const useremail = req.params?.email
             const id = req.params?.id 
-            const query = { _id: new ObjectId(id) }
+            const query = {email:useremail, _id: new ObjectId(id) }
             const result = await reviewCollection.deleteOne(query)
             res.send(result)
         })
+
+        // meal request api
 
         app.post('/mealrequest', async (req, res) => {
             const mealRequest = req.body
@@ -208,18 +238,40 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/mealrequest',verifyToken, async (req, res) => {
+        // meal request update by admin releted api
+
+        app.get('/admin/mealreq',verifyToken, async (req, res) => {
             const result = await mealRequestCollection.find().toArray()
             res.send(result)
         })
 
-        app.delete('/mealreq/:id',verifyToken, async (req, res) => {
+        app.patch('/mealreq/user/:email/meal/:id',verifyToken, async (req, res) => {
+            const email = req.params?.email 
+            const id = req.params?.id
+            const filter = { requested_user: email, _id: new ObjectId(id) }
+            const updateDoc = { $set: { status: "delivered" } }
+            const result = await mealRequestCollection.updateOne(filter, updateDoc)
+            res.send(result)
+        })
+
+        // meal request preview by user
+
+        app.get('/mealrequest/user/:email', verifyToken, async (req, res) => {
+            const reqemail = req.params?.email
+            const query = { requested_user:reqemail}
+            const result = await mealRequestCollection.find(query).toArray()
+            res.send(result)
+        })
+
+        app.delete('/mealreq/useremail/:email/meal/:id', verifyToken, async (req, res) => {
+            const reqemail = req.params?.email
             const id = req.params.id
-            const query = { _id: new ObjectId(id) }
+            const query = { requested_user:reqemail, _id: new ObjectId(id) }
             const result = await mealRequestCollection.deleteOne(query)
             res.send(result)
         })
 
+        // package releted api
 
         app.get('/package', async (req, res) => {
             const result = await packageCollection.find().toArray()
