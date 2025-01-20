@@ -30,7 +30,7 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@bunkclu
 const client = new MongoClient(uri, {
     serverApi: {
         version: ServerApiVersion.v1,
-        strict: true,
+        strict: false,
         deprecationErrors: true,
     }
 });
@@ -46,6 +46,16 @@ async function run() {
         const mealRequestCollection = client.db('BunkInnDB').collection('mealRequest')
         const paymentCollection = client.db('BunkInnDB').collection('payments')
         const upcomingmealCollection = client.db('BunkInnDB').collection('upcoming_meals')
+        await mealCollection.createIndex({
+            title: "text",
+            category: "text",
+            ingredients: "text",
+            post_time: "text",
+            distributor: "text",
+            distributor_email: "text",
+            review: "text",
+            likes: "text"
+        });
 
         // jwt releted api
 
@@ -228,7 +238,7 @@ async function run() {
 
         // meals by admin all meal
 
-        app.get('/meals/byadmin', async (req, res) => {
+        app.get('/meals/byadmin',verifyToken,verifyAdmin, async (req, res) => {
             const sort = req.query?.sort;
             const page = parseInt(req.query?.page) || 1;
             const itemsPerPage = 10;
@@ -275,18 +285,43 @@ async function run() {
         });
 
 
+        // app.get('/meals', async (req, res) => {
+        //     const search = req.query?.search;
+        //     const category = req.query?.category;
+        //     const price = req.query?.price;
+
+
+        //     let query = {};
+        //     if (search) {
+        //         query = {
+        //             title: {
+        //                 $regex: search, $options: 'i'
+        //             }
+        //         };
+        //     }
+        //     if (category && category !== 'All Categories') {
+        //         query.category = category;
+        //     }
+
+        //     let setPriceQuery = {};
+        //     if (price === 'Price(low to high)') {
+        //         setPriceQuery.price = 1;
+        //     } else if (price === 'Price(high to low)') {
+        //         setPriceQuery.price = -1;
+        //     }
+        //     const result = await mealCollection.find(query).sort({ ...setPriceQuery }).toArray();
+        //     res.send(result);
+        // });
+
         app.get('/meals', async (req, res) => {
             const search = req.query?.search;
             const category = req.query?.category;
             const price = req.query?.price;
 
-
             let query = {};
             if (search) {
                 query = {
-                    title: {
-                        $regex: search, $options: 'i'
-                    }
+                    $text: { $search: search, }
                 };
             }
             if (category && category !== 'All Categories') {
@@ -299,9 +334,11 @@ async function run() {
             } else if (price === 'Price(high to low)') {
                 setPriceQuery.price = -1;
             }
+
             const result = await mealCollection.find(query).sort({ ...setPriceQuery }).toArray();
             res.send(result);
         });
+
 
         app.delete('/meals/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params?.id
