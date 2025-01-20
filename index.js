@@ -42,7 +42,6 @@ async function run() {
         const mealRequestCollection = client.db('BunkInnDB').collection('mealRequest')
         const paymentCollection = client.db('BunkInnDB').collection('payments')
         const upcomingmealCollection = client.db('BunkInnDB').collection('upcoming_meals')
-        // db.meals.createIndex({ title: "text", category: "text", description: "text", ingredients: "text" })
 
         // jwt releted api
 
@@ -110,6 +109,10 @@ async function run() {
         app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
             const userEmail = req.decoded?.email
             const search = req.query?.search || "";
+            const page = parseInt(req.query?.page) || 1;
+            const itemsPerPage = 10;
+            const skip = (page - 1) * itemsPerPage;
+
             const query = {
                 email: {
                     $ne: userEmail,
@@ -119,8 +122,19 @@ async function run() {
                     { email: { $regex: search, $options: "i" } }
                 ]
             }
-            const result = await userCollection.find(query).toArray()
-            res.send(result)
+            const totalItems = await userCollection.countDocuments(query);
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            const result = await userCollection
+                .find(query)
+                .skip(skip)
+                .limit(itemsPerPage)
+                .toArray()
+            res.send({
+                data: result,
+                currentPage: page,
+                totalPages: totalPages,
+                totalItems: totalItems
+            })
         })
 
 
@@ -141,12 +155,27 @@ async function run() {
 
         app.get('/upcomingmeal/byadmin', async (req, res) => {
             const sort = req.query.sort
+            const page = parseInt(req.query?.page) || 1;
+            const itemsPerPage = 10;
+            const skip = (page - 1) * itemsPerPage;
             let sortedData = {}
             if (sort === 'true') {
                 sortedData = { likes: 1 }
             }
-            const result = await upcomingmealCollection.find().sort(sortedData).toArray()
-            res.send(result)
+            const totalItems = await mealRequestCollection.countDocuments();
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            const result = await upcomingmealCollection
+                .find()
+                .sort(sortedData)
+                .skip(skip)
+                .limit(itemsPerPage)
+                .toArray()
+            res.send({
+                data: result,
+                currentPage: page,
+                totalPages: totalPages,
+                totalItems: totalItems
+            })
         })
 
         app.post('/upcoming/meal/byadmin', async (req, res) => {
@@ -173,7 +202,7 @@ async function run() {
             res.send(result)
         })
 
-        app.patch('upcomingmeal/like/:id', verifyToken, async (req, res) => {
+        app.patch('/upcomingmeal/like/:id', verifyToken, async (req, res) => {
             const id = req.params?.id
             const filter = { _id: new ObjectId(id) };
             const updateDoc = {
@@ -193,11 +222,49 @@ async function run() {
             res.send(result)
         })
 
+        // meals by admin all meal
+
+        app.get('/meals/byadmin', async (req, res) => {
+            const sort = req.query?.sort;
+            const page = parseInt(req.query?.page) || 1;
+            const itemsPerPage = 10;
+            const skip = (page - 1) * itemsPerPage;
+
+            let sortQuery = {};
+            if (sort === 'likes') {
+                sortQuery.likes = -1; 
+            } else if (sort === 'review-count') {
+                sortQuery.review_count = -1; 
+            }
+
+            try {
+                const totalItems = await mealCollection.countDocuments(); 
+                const totalPages = Math.ceil(totalItems / itemsPerPage);
+                const result = await mealCollection
+                    .find()
+                    .sort(sortQuery) 
+                    .skip(skip) 
+                    .limit(itemsPerPage) 
+                    .toArray();
+
+                res.send({
+                    data: result,
+                    currentPage: page,
+                    totalPages: totalPages,
+                    totalItems: totalItems,
+                });
+            } catch (error) {
+                console.error('Error fetching meals:', error);
+                res.status(500).send({ error: 'Failed to fetch meals' });
+            }
+        });
+
+
         app.get('/meals', async (req, res) => {
             const search = req.query?.search;
             const category = req.query?.category;
             const price = req.query?.price;
-            const sort = req.query?.sort;
+
 
             let query = {};
             if (search) {
@@ -217,14 +284,7 @@ async function run() {
             } else if (price === 'Price(high to low)') {
                 setPriceQuery.price = -1;
             }
-
-            let sortQuery = {};
-            if (sort === 'likes') {
-                sortQuery.likes = -1;
-            } else if (sort === 'review-Count') {
-                sortQuery.review_count = -1;
-            }
-            const result = await mealCollection.find(query).sort({ ...setPriceQuery, ...sortQuery }).toArray();
+            const result = await mealCollection.find(query).sort({ ...setPriceQuery}).toArray();
             res.send(result);
         });
 
@@ -280,8 +340,22 @@ async function run() {
         // admin can get all review
 
         app.get('/admin/reviews', verifyToken, verifyAdmin, async (req, res) => {
-            const result = await reviewCollection.find().toArray()
-            res.send(result)
+            const page = parseInt(req.query?.page)
+            const itemsPerPage = 10;
+            const skip = (page - 1) * itemsPerPage;
+            const totalItems = await mealRequestCollection.countDocuments();
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            const result = await reviewCollection
+                .find()
+                .skip(skip)
+                .limit(itemsPerPage)
+                .toArray()
+            res.send({
+                data: result,
+                currentPage: page,
+                totalPages: totalPages,
+                totalItems: totalItems
+            })
         })
 
         app.delete('/admin/review/:id', verifyToken, verifyAdmin, async (req, res) => {
@@ -295,9 +369,23 @@ async function run() {
 
         app.get('/reviews/useremail/:email', verifyToken, async (req, res) => {
             const useremail = req.params.email
+            const page = parseInt(req.query?.page) || 1;
+            const itemsPerPage = 10;
+            const skip = (page - 1) * itemsPerPage;
             const query = { email: useremail }
-            const result = await reviewCollection.find(query).toArray()
-            res.send(result)
+            const totalItems = await mealRequestCollection.countDocuments(query);
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            const result = await reviewCollection
+                .find(query)
+                .skip(skip)
+                .limit(itemsPerPage)
+                .toArray()
+            res.send({
+                data: result,
+                currentPage: page,
+                totalPages: totalPages,
+                totalItems: totalItems,
+            })
         })
 
         // app.get('/reviews/adminEmail/:email', verifyToken, async (req, res) => {
@@ -327,9 +415,9 @@ async function run() {
 
         app.get('/admin/mealreq', verifyToken, verifyAdmin, async (req, res) => {
             const search = req.query?.search || "";
-            const page = parseInt(req.query.page) || 1; // Default to page 1 if not provided
-            const itemsPerPage = 10; // Set items per page
-            const skip = (page - 1) * itemsPerPage; // Calculate the number of items to skip
+            const page = parseInt(req.query?.page) || 1;
+            const itemsPerPage = 10;
+            const skip = (page - 1) * itemsPerPage;
 
             let query = {};
             if (search) {
@@ -340,11 +428,13 @@ async function run() {
                     ]
                 };
             }
-
-            const totalItems = await mealRequestCollection.countDocuments(query); // Get the total number of records matching the query
-            const totalPages = Math.ceil(totalItems / itemsPerPage); // Calculate total pages
-
-            const result = await mealRequestCollection.find(query).skip(skip).limit(itemsPerPage).toArray();
+            const totalItems = await mealRequestCollection.countDocuments(query);
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            const result = await mealRequestCollection
+                .find(query)
+                .skip(skip)
+                .limit(itemsPerPage)
+                .toArray();
 
             res.send({
                 data: result,
@@ -368,9 +458,23 @@ async function run() {
 
         app.get('/mealrequest/user/:email', verifyToken, async (req, res) => {
             const reqemail = req.params?.email
+            const page = parseInt(req.query?.page) || 1;
+            const itemsPerPage = 10;
+            const skip = (page - 1) * itemsPerPage;
             const query = { requested_user: reqemail }
-            const result = await mealRequestCollection.find(query).toArray()
-            res.send(result)
+            const totalItems = await mealRequestCollection.countDocuments(query);
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            const result = await mealRequestCollection
+                .find(query)
+                .skip(skip)
+                .limit(itemsPerPage)
+                .toArray()
+            res.send({
+                data: result,
+                currentPage: page,
+                totalPages: totalPages,
+                totalItems: totalItems
+            })
         })
 
         app.delete('/mealreq/useremail/:email/meal/:id', verifyToken, async (req, res) => {
@@ -440,8 +544,8 @@ async function run() {
 
 
 
-        await client.db("admin").command({ ping: 1 });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        // await client.db("admin").command({ ping: 1 });
+        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // await client.close();
     }
