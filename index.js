@@ -7,7 +7,12 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const port = process.env.PORT || 5000
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
-app.use(cors())
+app.use(cors(
+    {
+        origin: 'http://localhost:5173',
+        credentials: true
+    }
+))
 app.use(express.json())
 
 
@@ -37,6 +42,7 @@ async function run() {
         const mealRequestCollection = client.db('BunkInnDB').collection('mealRequest')
         const paymentCollection = client.db('BunkInnDB').collection('payments')
         const upcomingmealCollection = client.db('BunkInnDB').collection('upcoming_meals')
+        // db.meals.createIndex({ title: "text", category: "text", description: "text", ingredients: "text" })
 
         // jwt releted api
 
@@ -61,21 +67,33 @@ async function run() {
             })
         }
 
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded.email
+            const query = { email: email }
+            const user = await userCollection.findOne(query)
+            const isAdmin = user?.role === 'admin'
+            if (!isAdmin) {
+                return res.status(403).send({ message: 'Forbidden Access' })
+            }
+            next()
+        }
+
+        // user releted api
+
         app.post('/users', async (req, res) => {
             const user = req.body
             const result = await userCollection.insertOne(user)
             res.send(result)
         })
 
-        app.get('/users/;email', async (req, res) => {
+        app.get('/users/:email', verifyToken, async (req, res) => {
             const useremail = req.params?.email
-            console.log(useremail);
-            const query = {email:useremail}
+            const query = { email: useremail }
             const result = await userCollection.findOne(query)
             res.send(result)
         })
-        
-        app.get('/users/admin/:email', verifyToken, async (req, res) => {
+
+        app.get('/users/admin/:email', verifyToken, verifyAdmin, async (req, res) => {
             const email = req.params.email
             if (email !== req.decoded.email) {
                 return res.status(403).send({ message: 'Forbidden Access' })
@@ -89,7 +107,7 @@ async function run() {
             res.send({ admin })
         })
 
-        app.get('/users', verifyToken, async (req, res) => {
+        app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
             const userEmail = req.decoded?.email
             const search = req.query?.search || "";
             const query = {
@@ -106,7 +124,7 @@ async function run() {
         })
 
 
-        app.patch('/users/admin/:id', async (req, res) => {
+        app.patch('/users/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params?.id
             const filter = { _id: new ObjectId(id) }
             const updateDoc = {
@@ -137,26 +155,39 @@ async function run() {
             res.send(result)
         })
 
-        app.post('/upcomingmeal/byadmin', async (req, res) => {
-            const meal = req.body
-            const result = await mealCollection.insertOne(meal)
+        app.post('/upcomingmeal/byadmin', verifyToken, verifyAdmin, async (req, res) => {
+            const meal = req.body;
+            const newMeal = { ...meal, _id: new ObjectId(), mealId: meal._id };
+            const result = await mealCollection.insertOne(newMeal);
             if (result.insertedId) {
-                const query = { _id: new ObjectId(meal._id) }
-                await upcomingmealCollection.deleteOne(query)
+                const query = { _id: new ObjectId(req.body._id) };
+                await upcomingmealCollection.deleteOne(query);
             }
-            res.send(result)
-        })
+            res.send(result);
+        });
 
         app.get('/upcoming/meal/details/:id', async (req, res) => {
-            const id = req.params?.id 
+            const id = req.params?.id
             const query = { _id: new ObjectId(id) }
             const result = await upcomingmealCollection.findOne(query)
             res.send(result)
         })
 
+        app.patch('upcomingmeal/like/:id', verifyToken, async (req, res) => {
+            const id = req.params?.id
+            const filter = { _id: new ObjectId(id) };
+            const updateDoc = {
+                $inc: { likes: 1 }
+            };
+            const result = await upcomingmealCollection.updateOne(filter, updateDoc);
+            res.send(result)
+        });
+
+
+
         //  meals releted api
 
-        app.post('/uploadmeals', async (req, res) => {
+        app.post('/uploadmeals', verifyToken, verifyAdmin, async (req, res) => {
             const meal = req.body
             const result = await mealCollection.insertOne(meal)
             res.send(result)
@@ -197,10 +228,7 @@ async function run() {
             res.send(result);
         });
 
-
-
-
-        app.delete('/meals/:id', async (req, res) => {
+        app.delete('/meals/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params?.id
             const query = { _id: new ObjectId(id) }
             const result = await mealCollection.deleteOne(query)
@@ -225,7 +253,7 @@ async function run() {
         })
 
 
-        app.patch('/like/:id', async (req, res) => {
+        app.patch('/like/:id', verifyToken, async (req, res) => {
             const id = req.params?.id
             const filter = { _id: new ObjectId(id) };
             const updateDoc = {
@@ -251,12 +279,12 @@ async function run() {
 
         // admin can get all review
 
-        app.get('/admin/reviews', async (req, res) => {
+        app.get('/admin/reviews', verifyToken, verifyAdmin, async (req, res) => {
             const result = await reviewCollection.find().toArray()
             res.send(result)
         })
 
-        app.delete('/admin/review/:id', async (req, res) => {
+        app.delete('/admin/review/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params?.id
             const query = { _id: new ObjectId(id) }
             const result = await reviewCollection.deleteOne(query)
@@ -289,7 +317,7 @@ async function run() {
 
         // meal request api
 
-        app.post('/mealrequest', async (req, res) => {
+        app.post('/mealrequest', verifyToken, async (req, res) => {
             const mealRequest = req.body
             const result = await mealRequestCollection.insertOne(mealRequest)
             res.send(result)
@@ -297,9 +325,13 @@ async function run() {
 
         // meal request update by admin releted api
 
-        app.get('/admin/mealreq', verifyToken, async (req, res) => {
-            const search = req.query?.search
-            let query = {}
+        app.get('/admin/mealreq', verifyToken, verifyAdmin, async (req, res) => {
+            const search = req.query?.search || "";
+            const page = parseInt(req.query.page) || 1; // Default to page 1 if not provided
+            const itemsPerPage = 10; // Set items per page
+            const skip = (page - 1) * itemsPerPage; // Calculate the number of items to skip
+
+            let query = {};
             if (search) {
                 query = {
                     $or: [
@@ -309,9 +341,19 @@ async function run() {
                 };
             }
 
-            const result = await mealRequestCollection.find(query).toArray()
-            res.send(result)
-        })
+            const totalItems = await mealRequestCollection.countDocuments(query); // Get the total number of records matching the query
+            const totalPages = Math.ceil(totalItems / itemsPerPage); // Calculate total pages
+
+            const result = await mealRequestCollection.find(query).skip(skip).limit(itemsPerPage).toArray();
+
+            res.send({
+                data: result,
+                currentPage: page,
+                totalPages: totalPages,
+                totalItems: totalItems,
+            });
+        });
+
 
         app.patch('/mealreq/user/:email/meal/:id', verifyToken, async (req, res) => {
             const email = req.params?.email
@@ -346,7 +388,7 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/package/:id', async (req, res) => {
+        app.get('/package/:id', verifyToken, async (req, res) => {
             const id = req.params?.id
             const query = { _id: new ObjectId(id) }
             const result = await packageCollection.findOne(query)
