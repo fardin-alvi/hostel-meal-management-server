@@ -9,7 +9,11 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 app.use(cors(
     {
-        origin: 'http://localhost:5173',
+        origin: [
+            'http://localhost:5173',
+            'https://bunkinn-41df5.web.app',
+            'https://bunkinn-41df5.firebaseapp.com'
+        ],
         credentials: true
     }
 ))
@@ -33,7 +37,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
     try {
-        await client.connect();
+        
 
         const userCollection = client.db('BunkInnDB').collection('users')
         const mealCollection = client.db('BunkInnDB').collection('meals')
@@ -232,19 +236,19 @@ async function run() {
 
             let sortQuery = {};
             if (sort === 'likes') {
-                sortQuery.likes = -1; 
+                sortQuery.likes = -1;
             } else if (sort === 'review-count') {
-                sortQuery.review_count = -1; 
+                sortQuery.review_count = -1;
             }
 
             try {
-                const totalItems = await mealCollection.countDocuments(); 
+                const totalItems = await mealCollection.countDocuments();
                 const totalPages = Math.ceil(totalItems / itemsPerPage);
                 const result = await mealCollection
                     .find()
-                    .sort(sortQuery) 
-                    .skip(skip) 
-                    .limit(itemsPerPage) 
+                    .sort(sortQuery)
+                    .skip(skip)
+                    .limit(itemsPerPage)
                     .toArray();
 
                 res.send({
@@ -284,7 +288,7 @@ async function run() {
             } else if (price === 'Price(high to low)') {
                 setPriceQuery.price = -1;
             }
-            const result = await mealCollection.find(query).sort({ ...setPriceQuery}).toArray();
+            const result = await mealCollection.find(query).sort({ ...setPriceQuery }).toArray();
             res.send(result);
         });
 
@@ -295,15 +299,6 @@ async function run() {
             res.send(result)
         })
 
-        // app.delete('/review/meal/:id', async (req, res) => {
-        //     const useremail = req.params?.email 
-        //     console.log(useremail);
-        //     const id = req.params.id 
-        //     console.log(id);
-        //     const query = { email: useremail, _id: new ObjectId(id) }
-        //     const result = await reviewCollection.deleteOne(query)
-        //     res.send(result)
-        // })
 
         app.get('/meal/:id', async (req, res) => {
             const id = req.params.id
@@ -387,13 +382,6 @@ async function run() {
                 totalItems: totalItems,
             })
         })
-
-        // app.get('/reviews/adminEmail/:email', verifyToken, async (req, res) => {
-        //     const useremail = req.params?.email
-        //     const query = { email: useremail }
-        //     const result = await reviewCollection.find(query).toArray()
-        //     res.send(result)
-        // })
 
         app.delete('/reviews/useremail/:email/meal/:id', verifyToken, async (req, res) => {
             const useremail = req.params?.email
@@ -536,13 +524,6 @@ async function run() {
             const result = await paymentCollection.findOne(query)
             res.send(result)
         })
-
-
-
-
-
-
-
 
         // await client.db("admin").command({ ping: 1 });
         // console.log("Pinged your deployment. You successfully connected to MongoDB!");
