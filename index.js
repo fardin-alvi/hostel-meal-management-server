@@ -263,6 +263,17 @@ async function run() {
             }
         });
 
+        app.put('/admin/mealupdate/:id', async (req, res) => {
+            const id = req.params.id;
+            const updatedMeal = req.body;
+            const filter = { _id: new ObjectId(id) };
+            const updateDoc = {
+                $set: updatedMeal,
+            };
+            const result = await mealCollection.updateOne(filter, updateDoc);
+            res.send(result);
+        });
+
 
         app.get('/meals', async (req, res) => {
             const search = req.query?.search;
@@ -389,6 +400,17 @@ async function run() {
             const query = { email: useremail, _id: new ObjectId(id) }
             const result = await reviewCollection.deleteOne(query)
             res.send(result)
+        })
+
+        app.patch('/reviews/user/:id', async (req, res) => {
+            const {review} = req?.body
+            const id = req.params?.id
+            const filter = {_id: new ObjectId(id) }
+            const updateDoc = {
+                $set: { review }, 
+            };
+            const result = await reviewCollection.updateOne(filter, updateDoc); 
+            res.send(result);
         })
 
         // meal request api
