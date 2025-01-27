@@ -46,16 +46,6 @@ async function run() {
         const mealRequestCollection = client.db('BunkInnDB').collection('mealRequest')
         const paymentCollection = client.db('BunkInnDB').collection('payments')
         const upcomingmealCollection = client.db('BunkInnDB').collection('upcoming_meals')
-        await mealCollection.createIndex({
-            title: "text",
-            category: "text",
-            ingredients: "text",
-            post_time: "text",
-            distributor: "text",
-            distributor_email: "text",
-            review: "text",
-            likes: "text"
-        });
 
         // jwt releted api
 
@@ -174,7 +164,7 @@ async function run() {
             const skip = (page - 1) * itemsPerPage;
             let sortedData = {}
             if (sort === 'true') {
-                sortedData = { likes: 1 }
+                sortedData = { likes: -1 }
             }
             const totalItems = await mealRequestCollection.countDocuments();
             const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -315,6 +305,7 @@ async function run() {
 
         app.get('/meals', async (req, res) => {
             const search = req.query?.search;
+
             const category = req.query?.category;
             const price = req.query?.price;
 
@@ -334,8 +325,11 @@ async function run() {
             } else if (price === 'Price(high to low)') {
                 setPriceQuery.price = -1;
             }
-
+            
             const result = await mealCollection.find(query).sort({ ...setPriceQuery }).toArray();
+
+            // const result = await mealCollection.find(query).toArray();
+
             res.send(result);
         });
 
@@ -370,6 +364,16 @@ async function run() {
         app.post('/review', async (req, res) => {
             const review = req.body
             const result = await reviewCollection.insertOne(review)
+            if (result?.insertedId) {
+                const mealId = review.mealId
+                const filter = { _id: new ObjectId(mealId) };
+                const updatedoc = {
+                    $inc: { review_count: 1 }
+                }
+                await mealCollection.updateOne(filter, updatedoc);
+                await reviewCollection.updateMany({ mealId }, updatedoc)
+                await mealRequestCollection.updateOne({ mealId }, updatedoc);
+            }
             res.send(result)
         })
 
@@ -401,12 +405,31 @@ async function run() {
             })
         })
 
+
         app.delete('/admin/review/:id', verifyToken, verifyAdmin, async (req, res) => {
-            const id = req.params?.id
-            const query = { _id: new ObjectId(id) }
-            const result = await reviewCollection.deleteOne(query)
-            res.send(result)
-        })
+            const id = req.params?.id;
+            const query = { _id: new ObjectId(id) };
+
+            const review = await reviewCollection.findOne(query);
+
+            const result = await reviewCollection.deleteOne(query);
+
+            if (result?.deletedCount === 1) {
+                const mealId = review?.mealId;
+                const mealQuery = { _id: new ObjectId(mealId) };
+
+                await mealCollection.updateOne(
+                    mealQuery,
+                    { $inc: { review_count: -1 } }
+                );
+                await mealRequestCollection.updateMany(
+                    { mealId },
+                    { $inc: { review_count: -1 } }
+                );
+            }
+
+            res.send(result);
+        });
 
         // user getting review releted api
 
@@ -435,7 +458,18 @@ async function run() {
             const useremail = req.params?.email
             const id = req.params?.id
             const query = { email: useremail, _id: new ObjectId(id) }
+            const review = await reviewCollection.findOne(query);
             const result = await reviewCollection.deleteOne(query)
+
+            if (result?.deletedCount === 1) {
+                const mealId = review.mealId;
+                const updateDoc = { $inc: { review_count: -1 } };
+
+                await mealCollection.updateOne({ _id: new ObjectId(mealId) }, updateDoc);
+                await reviewCollection.updateMany({ mealId }, updateDoc);
+                await mealRequestCollection.updateOne({ mealId }, updateDoc);
+
+            }
             res.send(result)
         })
 
