@@ -274,35 +274,6 @@ async function run() {
             res.send(result);
         });
 
-
-        // app.get('/meals', async (req, res) => {
-        //     const search = req.query?.search;
-        //     const category = req.query?.category;
-        //     const price = req.query?.price;
-
-
-        //     let query = {};
-        //     if (search) {
-        //         query = {
-        //             title: {
-        //                 $regex: search, $options: 'i'
-        //             }
-        //         };
-        //     }
-        //     if (category && category !== 'All Categories') {
-        //         query.category = category;
-        //     }
-
-        //     let setPriceQuery = {};
-        //     if (price === 'Price(low to high)') {
-        //         setPriceQuery.price = 1;
-        //     } else if (price === 'Price(high to low)') {
-        //         setPriceQuery.price = -1;
-        //     }
-        //     const result = await mealCollection.find(query).sort({ ...setPriceQuery }).toArray();
-        //     res.send(result);
-        // });
-
         app.get('/meals', async (req, res) => {
             const search = req.query?.search;
 
@@ -328,8 +299,6 @@ async function run() {
             
             const result = await mealCollection.find(query).sort({ ...setPriceQuery }).toArray();
 
-            // const result = await mealCollection.find(query).toArray();
-
             res.send(result);
         });
 
@@ -353,11 +322,14 @@ async function run() {
         app.patch('/like/:id', verifyToken, async (req, res) => {
             const id = req.params?.id
             const filter = { _id: new ObjectId(id) };
+            const queryfilter = { mealId: id };
             const updateDoc = {
                 $inc: { likes: 1 }
             };
-            const result = await mealCollection.updateOne(filter, updateDoc);
-            res.send(result)
+            const mealresult = await mealCollection.updateOne(filter, updateDoc);
+            const reviewresult = await reviewCollection.updateMany(queryfilter, updateDoc);
+            const requestresult = await mealRequestCollection.updateMany(queryfilter, updateDoc);
+            res.send({mealresult,reviewresult,requestresult})
         });
 
 
