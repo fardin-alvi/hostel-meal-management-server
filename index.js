@@ -595,6 +595,15 @@ async function run() {
             res.send(result)
         })
 
+        // statistics for admin
+
+        app.get('/admin-stats', verifyToken, verifyAdmin, async (req, res) => {
+            const totalUsers = await userCollection.estimatedDocumentCount();
+            const totalMeals = await mealCollection.estimatedDocumentCount();
+            const totalMealRequests = await mealRequestCollection.estimatedDocumentCount();
+            res.send({ totalUsers, totalMeals, totalMealRequests });
+        });
+
         // await client.db("admin").command({ ping: 1 });
         // console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
