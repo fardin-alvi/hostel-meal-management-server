@@ -604,6 +604,40 @@ async function run() {
             res.send({ totalUsers, totalMeals, totalMealRequests });
         });
 
+        app.get('/admin-mealChart', verifyToken, verifyAdmin, async (req, res) => {
+            const pipeline = [
+                {
+                    $addFields: {
+                        requestDate: {
+                            $dateFromString: {
+                                dateString: "$requestTime"
+                            }
+                        }
+                    }
+                },
+                {
+                    $group: {
+                        _id: {
+                            $dateToString: { format: "%m", date: "$requestDate" }
+                        },
+                        count: { $sum: 1 }
+                    }
+                },
+                {
+                    $sort: { _id: 1 }
+                }
+            ];
+            const result = await mealRequestCollection.aggregate(pipeline).toArray();
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const formattedResult = result.map(item => ({
+                month: monthNames[parseInt(item._id) - 1],
+                count: item.count
+            }));
+            res.send(formattedResult);
+        });
+
+        
+
         // await client.db("admin").command({ ping: 1 });
         // console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
