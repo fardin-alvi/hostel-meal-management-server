@@ -405,6 +405,11 @@ async function run() {
 
         // user getting review releted api
 
+        app.get('/reviewes', async (req, res) => {
+            const result = await reviewCollection.find().toArray()
+            res.send(result)
+        })
+
         app.get('/reviews/useremail/:email', verifyToken, async (req, res) => {
             const useremail = req.params.email
             const page = parseInt(req.query?.page) || 1;
